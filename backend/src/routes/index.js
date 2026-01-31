@@ -102,7 +102,7 @@ router.post("/api/clientes", async (req, res) => {
 
     return res.status(201).json(created);
   } catch (err) {
-    // Duplicidade (unique constraint) no Prisma
+
     if (err && err.code === "P2002") {
       const target = Array.isArray(err.meta?.target) ? err.meta.target.join(", ") : "campo único";
       return res.status(409).json({ message: `Conflito: ${target} já cadastrado` });
@@ -113,10 +113,37 @@ router.post("/api/clientes", async (req, res) => {
   }
 });
 
+router.get("/api/cep/:cep", async (req, res) => {
+  try {
+    const cep = onlyDigits(req.params.cep);
 
-router.get("/api/cep/:cep", (req, res) => {
-  return res.status(501).json({ message: "TODO: implementar proxy ViaCEP" });
+    if (!isValidCEP(cep)) {
+      return res.status(400).json({ message: "cep inválido (8 dígitos)" });
+    }
+
+    const url = `https://viacep.com.br/ws/${cep}/json/`;
+    const response = await fetch(url, {
+      headers: { "Accept": "application/json" }
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ message: "Falha ao consultar ViaCEP" });
+    }
+
+    const data = await response.json();
+
+    // ViaCEP retorna { erro: true } quando não encontra
+    if (data.erro) {
+      return res.status(404).json({ message: "CEP não encontrado" });
+    }
+
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Erro interno ao consultar CEP" });
+  }
 });
+
 
 router.get("/api/clientes/:id", async (req, res) => {
   try {
